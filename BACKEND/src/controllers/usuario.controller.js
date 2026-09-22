@@ -147,3 +147,18 @@ exports.login = async (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor al iniciar sesión' });
     }
 };
+
+// DELETE /api/usuarios/:id
+exports.eliminarUsuario = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const filasAfectadas = await UsuarioModel.eliminar(id);
+        if (filasAfectadas === 0) {
+            return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+        }
+        res.status(200).json({ mensaje: 'Usuario eliminado exitosamente' });
+    } catch (error) {
+        console.error('Error al eliminar usuario:', error);
+        res.status(500).json({ error: 'Error interno al eliminar el usuario' });
+    }
+};

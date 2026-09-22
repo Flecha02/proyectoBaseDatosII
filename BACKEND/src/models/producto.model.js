@@ -91,9 +91,16 @@ async function actualizarPrecioYStock(id, { precioVentaProducto, stockMinimoProd
     return resultado.affectedRows;
 }
 
+async function eliminarProducto(id) {
+    const sql = 'DELETE FROM Producto WHERE idProducto = ?';
+    const [resultado] = await pool.query(sql, [id]);
+    return resultado.affectedRows;
+}
+
 module.exports = {
     obtenerProductos,
     obtenerProductoPorId,
     crearProducto,
-    actualizarPrecioYStock
+    actualizarPrecioYStock,
+    eliminarProducto
 };

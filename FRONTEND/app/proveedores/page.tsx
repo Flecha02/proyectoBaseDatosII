@@ -1,69 +1,116 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { api, ApiError } from '@/lib/api';
 
-// Datos iniciales de prueba (Mock Data)
-const INITIAL_SUPPLIERS = [
-  { id: 1, nombre: 'Pinturas Químicas de Guatemala', nit: '1234567-8', telefono: '2222-1111', direccion: 'Calzada Roosevelt 12-45, Zona 11' },
-  { id: 2, nombre: 'Solventes & Químicos Industriales', nit: '8765432-1', telefono: '2333-4444', direccion: 'Km 15.5 Carretera al Pacífico' },
-  { id: 3, nombre: 'Importadora de Brochas y Rodillos', nit: '9988776-5', telefono: '2444-5555', direccion: 'Avenida Petapa 34-10, Zona 12' },
-  { id: 4, nombre: 'Barnices y Acabados de Madera', nit: 'CF', telefono: '2555-6666', direccion: 'Zona Industrial, Quetzaltenango' },
-];
+interface Proveedor {
+  idProveedor: number;
+  nitProveedor: string;
+  nombreProveedor: string;
+  telefonoProveedor?: string;
+  direccionProveedor?: string;
+}
 
 export default function GestionProveedoresPage() {
-  const [proveedores, setProveedores] = useState(INITIAL_SUPPLIERS);
+  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingSupplier, setEditingSupplier] = useState(null);
+  const [editingSupplier, setEditingSupplier] = useState<Proveedor | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
-    nombre: '',
-    nit: '',
-    telefono: '',
-    direccion: '',
+    nombreProveedor: '',
+    nitProveedor: '',
+    telefonoProveedor: '',
+    direccionProveedor: '',
   });
+
+  const cargarProveedores = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await api.get<Proveedor[]>('/proveedores');
+      setProveedores(data || []);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError('Error al cargar la lista de proveedores');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    cargarProveedores();
+  }, []);
 
   const handleOpenCreateModal = () => {
     setEditingSupplier(null);
-    setFormData({ nombre: '', nit: '', telefono: '', direccion: '' });
-    setIsModalOpen(true);
-  };
-
-  const handleOpenEditModal = (supplier) => {
-    setEditingSupplier(supplier);
     setFormData({
-      nombre: supplier.nombre,
-      nit: supplier.nit,
-      telefono: supplier.telefono,
-      direccion: supplier.direccion,
+      nombreProveedor: '',
+      nitProveedor: '',
+      telefonoProveedor: '',
+      direccionProveedor: '',
     });
     setIsModalOpen(true);
   };
 
-  const handleChange = (e) => {
+  const handleOpenEditModal = (supplier: Proveedor) => {
+    setEditingSupplier(supplier);
+    setFormData({
+      nombreProveedor: supplier.nombreProveedor || '',
+      nitProveedor: supplier.nitProveedor || '',
+      telefonoProveedor: supplier.telefonoProveedor || '',
+      direccionProveedor: supplier.direccionProveedor || '',
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
 
-    if (editingSupplier) {
-      // Editar Proveedor
-      setProveedores((prev) =>
-        prev.map((p) => (p.id === editingSupplier.id ? { ...p, ...formData } : p))
-      );
-    } else {
-      // Crear Proveedor
-      const newSupplier = { id: Date.now(), ...formData };
-      setProveedores((prev) => [...prev, newSupplier]);
+    try {
+      if (editingSupplier) {
+        // Editar Proveedor (PUT)
+        await api.put(`/proveedores/${editingSupplier.idProveedor}`, formData);
+      } else {
+        // Crear Proveedor (POST)
+        await api.post('/proveedores', formData);
+      }
+      setIsModalOpen(false);
+      await cargarProveedores();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        alert(err.message);
+      } else {
+        alert('Error al guardar el proveedor');
+      }
+    } finally {
+      setSubmitting(false);
     }
-
-    setIsModalOpen(false);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id: number) => {
     if (confirm('¿Estás seguro de que deseas eliminar este proveedor?')) {
-      setProveedores((prev) => prev.filter((p) => p.id !== id));
+      try {
+        await api.delete(`/proveedores/${id}`);
+        setProveedores((prev) => prev.filter((p) => p.idProveedor !== id));
+      } catch (err) {
+        if (err instanceof ApiError) {
+          alert(err.message);
+        } else {
+          alert('Error al eliminar el proveedor');
+        }
+      }
     }
   };
 
@@ -86,6 +133,19 @@ export default function GestionProveedoresPage() {
           </button>
         </div>
 
+        {/* MENSAJE DE ERROR */}
+        {error && (
+          <div className="mb-4 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center justify-between">
+            <span>{error}</span>
+            <button 
+              onClick={cargarProveedores}
+              className="underline text-xs font-semibold ml-4 hover:text-red-900"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
+
         {/* TABLA DE PROVEEDORES */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
@@ -100,29 +160,43 @@ export default function GestionProveedoresPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {proveedores.map((supplier) => (
-                  <tr key={supplier.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-800">{supplier.nombre}</td>
-                    <td className="px-6 py-4 font-mono text-xs">{supplier.nit}</td>
-                    <td className="px-6 py-4">{supplier.telefono}</td>
-                    <td className="px-6 py-4 text-slate-600">{supplier.direccion}</td>
-
-                    <td className="px-6 py-4 text-right space-x-2">
-                      <button
-                        onClick={() => handleOpenEditModal(supplier)}
-                        className="text-blue-600 hover:text-blue-800 font-medium text-xs px-2 py-1 rounded hover:bg-blue-50"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => handleDelete(supplier.id)}
-                        className="text-rose-600 hover:text-rose-800 font-medium text-xs px-2 py-1 rounded hover:bg-rose-50"
-                      >
-                        Eliminar
-                      </button>
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-slate-400 text-sm">
+                      Cargando proveedores desde la base de datos...
                     </td>
                   </tr>
-                ))}
+                ) : proveedores.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-slate-400 text-sm">
+                      No hay proveedores registrados en la base de datos.
+                    </td>
+                  </tr>
+                ) : (
+                  proveedores.map((supplier) => (
+                    <tr key={supplier.idProveedor} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-6 py-4 font-medium text-slate-800">{supplier.nombreProveedor}</td>
+                      <td className="px-6 py-4 font-mono text-xs">{supplier.nitProveedor}</td>
+                      <td className="px-6 py-4">{supplier.telefonoProveedor || '-'}</td>
+                      <td className="px-6 py-4 text-slate-600">{supplier.direccionProveedor || '-'}</td>
+
+                      <td className="px-6 py-4 text-right space-x-2">
+                        <button
+                          onClick={() => handleOpenEditModal(supplier)}
+                          className="text-blue-600 hover:text-blue-800 font-medium text-xs px-2 py-1 rounded hover:bg-blue-50"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDelete(supplier.idProveedor)}
+                          className="text-rose-600 hover:text-rose-800 font-medium text-xs px-2 py-1 rounded hover:bg-rose-50"
+                        >
+                          Eliminar
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -141,8 +215,8 @@ export default function GestionProveedoresPage() {
                   <label className="block text-xs font-medium text-slate-700 mb-1">Nombre o Empresa</label>
                   <input
                     type="text"
-                    name="nombre"
-                    value={formData.nombre}
+                    name="nombreProveedor"
+                    value={formData.nombreProveedor}
                     onChange={handleChange}
                     required
                     placeholder="Ej. Distribuidora Química"
@@ -155,8 +229,8 @@ export default function GestionProveedoresPage() {
                     <label className="block text-xs font-medium text-slate-700 mb-1">NIT</label>
                     <input
                       type="text"
-                      name="nit"
-                      value={formData.nit}
+                      name="nitProveedor"
+                      value={formData.nitProveedor}
                       onChange={handleChange}
                       required
                       placeholder="Ej. 1234567-8"
@@ -168,10 +242,9 @@ export default function GestionProveedoresPage() {
                     <label className="block text-xs font-medium text-slate-700 mb-1">Teléfono</label>
                     <input
                       type="text"
-                      name="telefono"
-                      value={formData.telefono}
+                      name="telefonoProveedor"
+                      value={formData.telefonoProveedor}
                       onChange={handleChange}
-                      required
                       placeholder="Ej. 2222-0000"
                       className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-800 text-sm"
                     />
@@ -182,10 +255,9 @@ export default function GestionProveedoresPage() {
                   <label className="block text-xs font-medium text-slate-700 mb-1">Dirección</label>
                   <input
                     type="text"
-                    name="direccion"
-                    value={formData.direccion}
+                    name="direccionProveedor"
+                    value={formData.direccionProveedor}
                     onChange={handleChange}
-                    required
                     placeholder="Ej. Calzada Roosevelt 12-45"
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-800 text-sm"
                   />
@@ -202,9 +274,10 @@ export default function GestionProveedoresPage() {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium transition-colors"
+                    disabled={submitting}
+                    className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300 text-white text-sm font-medium transition-colors"
                   >
-                    {editingSupplier ? 'Guardar Cambios' : 'Crear Proveedor'}
+                    {submitting ? 'Guardando...' : editingSupplier ? 'Guardar Cambios' : 'Crear Proveedor'}
                   </button>
                 </div>
               </form>

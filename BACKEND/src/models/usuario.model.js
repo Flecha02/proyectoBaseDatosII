@@ -65,6 +65,13 @@ const UsuarioModel = {
 
         const [filas] = await db.query('SELECT estadoUsuario FROM Usuario WHERE idUsuario = ?', [id]);
         return filas[0].estadoUsuario;
+    },
+
+    // Eliminar usuario por ID
+    eliminar: async (id) => {
+        const query = 'DELETE FROM Usuario WHERE idUsuario = ?';
+        const [resultado] = await db.query(query, [id]);
+        return resultado.affectedRows;
     }
 };
 

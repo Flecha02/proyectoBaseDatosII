@@ -27,8 +27,13 @@ async function actualizarCliente(id, { nitCliente, nombreCliente, telefonoClient
         nombreCliente, 
         telefonoCliente, 
         direccionCliente, 
-        id
     ]);
+    return resultado.affectedRows;
+}
+
+async function eliminarCliente(id) {
+    const sql = 'DELETE FROM Cliente WHERE idCliente = ?';
+    const [resultado] = await pool.query(sql, [id]);
     return resultado.affectedRows;
 }
 
@@ -36,5 +41,6 @@ module.exports = {
     obtenerClientes,
     obtenerClientePorId,
     crearCliente,
-    actualizarCliente
+    actualizarCliente,
+    eliminarCliente
 };

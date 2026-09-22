@@ -1,95 +1,123 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { api, ApiError } from '@/lib/api';
 
-// Datos iniciales de prueba (Mock Data) enfocados en una distribuidora de pinturas
-const INITIAL_CLIENTS = [
-  { id: 1, nombre: 'Distribuidora El Pincel', nit: '1234567-8', telefono: '5555-0123', email: 'contacto@elpincel.com', direccion: 'Avenida 12, Zona 3 Ciudad Capital' },
-  { id: 2, nombre: 'Constructora Horizon', nit: '8765432-1', telefono: '5555-9876', email: 'compras@horizon.com', direccion: 'Avenida 12, Zona 2 Solola' },
-  { id: 3, nombre: 'Juan Carlos Ruiz', nit: 'CF', telefono: '5555-4321', email: 'juan.ruiz@gmail.com', direccion: 'Avenida 12, Zona 10 Quetzaltenango' },
-];
+interface Cliente {
+  idCliente: number;
+  nitCliente: string;
+  nombreCliente: string;
+  telefonoCliente: string;
+  direccionCliente: string;
+  correoCliente?: string;
+}
 
 export default function GestionClientesPage() {
-  const [clientes, setClientes] = useState(INITIAL_CLIENTS);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingClient, setEditingClient] = useState(null); // null = Crear, objeto = Editar
+  const [editingClient, setEditingClient] = useState<Cliente | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
-    nombre: '',
-    nit: '',
-    telefono: '',
-    email: '',
-    direccion: '', 
+    nombreCliente: '',
+    nitCliente: '',
+    telefonoCliente: '',
+    direccionCliente: '',
   });
+
+  // Cargar clientes desde la API
+  const cargarClientes = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await api.get<Cliente[]>('/clientes');
+      setClientes(data || []);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError('Error al cargar la lista de clientes');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    cargarClientes();
+  }, []);
 
   // Abrir modal para Crear
   const handleOpenCreateModal = () => {
     setEditingClient(null);
-    setFormData({ nombre: '', nit: '', telefono: '', email: '', direccion: '' });
+    setFormData({
+      nombreCliente: '',
+      nitCliente: '',
+      telefonoCliente: '',
+      direccionCliente: '',
+    });
     setIsModalOpen(true);
   };
 
   // Abrir modal para Editar
-  const handleOpenEditModal = (client) => {
+  const handleOpenEditModal = (client: Cliente) => {
     setEditingClient(client);
     setFormData({
-      nombre: client.nombre,
-      nit: client.nit,
-      telefono: client.telefono,
-      email: client.email,
-      direccion: client.direccion,
+      nombreCliente: client.nombreCliente || '',
+      nitCliente: client.nitCliente || '',
+      telefonoCliente: client.telefonoCliente || '',
+      direccionCliente: client.direccionCliente || '',
     });
     setIsModalOpen(true);
   };
 
   // Manejar inputs del formulario
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   // Guardar (Crear / Actualizar)
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
 
-    if (editingClient) {
-      // Lógica de Edición (UPDATE)
-      setClientes((prev) =>
-        prev.map((c) => (c.id === editingClient.id ? { ...c, ...formData } : c))
-      );
-      console.log('Cliente actualizado:', { id: editingClient.id, ...formData });
-      /* Petición HTTP a Java:
-         await fetch(`http://localhost:8080/api/clientes/${editingClient.id}`, {
-           method: 'PUT',
-           headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify(formData)
-         });
-      */
-    } else {
-      // Lógica de Creación (CREATE)
-      const newClient = { id: Date.now(), ...formData };
-      setClientes((prev) => [...prev, newClient]);
-      console.log('Nuevo cliente creado:', newClient);
-      /* Petición HTTP a Java:
-         await fetch('http://localhost:8080/api/clientes', {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify(formData)
-         });
-      */
+    try {
+      if (editingClient) {
+        // Actualizar Cliente (PUT)
+        await api.put(`/clientes/${editingClient.idCliente}`, formData);
+      } else {
+        // Crear Cliente (POST)
+        await api.post('/clientes', formData);
+      }
+      setIsModalOpen(false);
+      await cargarClientes();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        alert(err.message);
+      } else {
+        alert('Ocurrió un error al guardar el cliente');
+      }
+    } finally {
+      setSubmitting(false);
     }
-
-    setIsModalOpen(false);
   };
 
   // Eliminar cliente (DELETE)
-  const handleDelete = (id) => {
+  const handleDelete = async (id: number) => {
     if (confirm('¿Estás seguro de que deseas eliminar este cliente?')) {
-      setClientes((prev) => prev.filter((c) => c.id !== id));
-      console.log('Cliente eliminado ID:', id);
-      /* Petición HTTP a Java:
-         await fetch(`http://localhost:8080/api/clientes/${id}`, { method: 'DELETE' });
-      */
+      try {
+        await api.delete(`/clientes/${id}`);
+        setClientes((prev) => prev.filter((c) => c.idCliente !== id));
+      } catch (err) {
+        if (err instanceof ApiError) {
+          alert(err.message);
+        } else {
+          alert('Error al eliminar el cliente');
+        }
+      }
     }
   };
 
@@ -112,6 +140,19 @@ export default function GestionClientesPage() {
           </button>
         </div>
 
+        {/* MENSAJE DE ERROR SI LO HAY */}
+        {error && (
+          <div className="mb-4 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center justify-between">
+            <span>{error}</span>
+            <button 
+              onClick={cargarClientes}
+              className="underline text-xs font-semibold ml-4 hover:text-red-900"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
+
         {/* TABLA DE CLIENTES (READ) */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
@@ -121,39 +162,47 @@ export default function GestionClientesPage() {
                   <th className="px-6 py-4">Cliente</th>
                   <th className="px-6 py-4">NIT</th>
                   <th className="px-6 py-4">Teléfono</th>
-                  <th className="px-6 py-4">Correo</th>
                   <th className="px-6 py-4">Dirección</th>
                   <th className="px-6 py-4 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {clientes.map((client) => (
-                  <tr key={client.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-800">{client.nombre}</td>
-                    <td className="px-6 py-4 font-mono text-xs">{client.nit}</td>
-                    <td className="px-6 py-4">{client.telefono}</td>
-                    <td className="px-6 py-4">{client.email}</td>
-                    <td className="px-6 py-4">
-                      <span className="px-6 py-4">
-                        {client.direccion }
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      <button
-                        onClick={() => handleOpenEditModal(client)}
-                        className="text-blue-600 hover:text-blue-800 font-medium text-xs px-2 py-1 rounded hover:bg-blue-50"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => handleDelete(client.id)}
-                        className="text-rose-600 hover:text-rose-800 font-medium text-xs px-2 py-1 rounded hover:bg-rose-50"
-                      >
-                        Eliminar
-                      </button>
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-slate-400 text-sm">
+                      Cargando clientes desde la base de datos...
                     </td>
                   </tr>
-                ))}
+                ) : clientes.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-slate-400 text-sm">
+                      No hay clientes registrados en la base de datos.
+                    </td>
+                  </tr>
+                ) : (
+                  clientes.map((client) => (
+                    <tr key={client.idCliente} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-6 py-4 font-medium text-slate-800">{client.nombreCliente}</td>
+                      <td className="px-6 py-4 font-mono text-xs">{client.nitCliente}</td>
+                      <td className="px-6 py-4">{client.telefonoCliente || '-'}</td>
+                      <td className="px-6 py-4">{client.direccionCliente || '-'}</td>
+                      <td className="px-6 py-4 text-right space-x-2">
+                        <button
+                          onClick={() => handleOpenEditModal(client)}
+                          className="text-blue-600 hover:text-blue-800 font-medium text-xs px-2 py-1 rounded hover:bg-blue-50"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDelete(client.idCliente)}
+                          className="text-rose-600 hover:text-rose-800 font-medium text-xs px-2 py-1 rounded hover:bg-rose-50"
+                        >
+                          Eliminar
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -172,8 +221,8 @@ export default function GestionClientesPage() {
                   <label className="block text-xs font-medium text-slate-700 mb-1">Nombre</label>
                   <input
                     type="text"
-                    name="nombre"
-                    value={formData.nombre}
+                    name="nombreCliente"
+                    value={formData.nombreCliente}
                     onChange={handleChange}
                     required
                     placeholder="Ej. Distribuidora El Pincel"
@@ -186,8 +235,8 @@ export default function GestionClientesPage() {
                     <label className="block text-xs font-medium text-slate-700 mb-1">NIT</label>
                     <input
                       type="text"
-                      name="nit"
-                      value={formData.nit}
+                      name="nitCliente"
+                      value={formData.nitCliente}
                       onChange={handleChange}
                       required
                       placeholder="Ej. 1234567-8 o CF"
@@ -199,10 +248,9 @@ export default function GestionClientesPage() {
                     <label className="block text-xs font-medium text-slate-700 mb-1">Teléfono</label>
                     <input
                       type="text"
-                      name="telefono"
-                      value={formData.telefono}
+                      name="telefonoCliente"
+                      value={formData.telefonoCliente}
                       onChange={handleChange}
-                      required
                       placeholder="Ej. 5555-0000"
                       className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-800 text-sm"
                     />
@@ -210,26 +258,12 @@ export default function GestionClientesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Correo Electrónico</label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    placeholder="cliente@correo.com"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-800 text-sm"
-                  />
-                </div>
-
-                <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">Dirección</label>
                   <input
                     type="text"
-                    name="direccion"
-                    value={formData.direccion}
+                    name="direccionCliente"
+                    value={formData.direccionCliente}
                     onChange={handleChange}
-                    required
                     placeholder="Ej: Av. Principal 123"
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-800 text-sm"
                   />
@@ -246,9 +280,10 @@ export default function GestionClientesPage() {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium transition-colors"
+                    disabled={submitting}
+                    className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300 text-white text-sm font-medium transition-colors"
                   >
-                    {editingClient ? 'Guardar Cambios' : 'Crear Cliente'}
+                    {submitting ? 'Guardando...' : editingClient ? 'Guardar Cambios' : 'Crear Cliente'}
                   </button>
                 </div>
               </form>

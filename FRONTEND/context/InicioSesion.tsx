@@ -3,10 +3,15 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 
-interface User {
-  nombre: string;
-  email: string;
-  role: string;
+export interface User {
+  idUsuario?: number;
+  nombreUsuario?: string;
+  correoUsuario?: string;
+  idRol?: number;
+  nombreRol?: string;
+  nombre?: string;
+  email?: string;
+  role?: string;
 }
 
 interface AuthContextType {
@@ -24,13 +29,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const savedUser = localStorage.getItem('app_user');
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch {
+        localStorage.removeItem('app_user');
+      }
     }
   }, []);
 
   const login = (userData: User) => {
-    setUser(userData);
-    localStorage.setItem('app_user', JSON.stringify(userData));
+    const normalizedUser: User = {
+      ...userData,
+      nombre: userData.nombre || userData.nombreUsuario || 'Usuario',
+      email: userData.email || userData.correoUsuario || '',
+      role: userData.role || userData.nombreRol || 'Usuario',
+    };
+    setUser(normalizedUser);
+    localStorage.setItem('app_user', JSON.stringify(normalizedUser));
     router.push('/dashboard');
   };
 

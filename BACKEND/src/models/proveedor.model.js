@@ -42,9 +42,16 @@ async function actualizarProveedor(id, { nitProveedor, nombreProveedor, telefono
     return resultado.affectedRows;
 }
 
+async function eliminarProveedor(id) {
+    const sql = 'DELETE FROM Proveedor WHERE idProveedor = ?';
+    const [resultado] = await pool.query(sql, [id]);
+    return resultado.affectedRows;
+}
+
 module.exports = {
     obtenerProveedores,
     obtenerProveedorPorId,
     crearProveedor,
-    actualizarProveedor
+    actualizarProveedor,
+    eliminarProveedor
 };

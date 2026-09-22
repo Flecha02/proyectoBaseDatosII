@@ -56,10 +56,25 @@ async function actualizarCliente(req, res) {
     }
 }
 
+async function eliminarCliente(req, res) {
+    const { id } = req.params;
+    try {
+        const filasAfectadas = await clienteModel.eliminarCliente(id);
+        if (filasAfectadas === 0) {
+            return res.status(404).json({ mensaje: 'Cliente no encontrado' });
+        }
+        res.status(200).json({ mensaje: 'Cliente eliminado correctamente' });
+    } catch (error) {
+        console.error('Error al eliminar cliente:', error);
+        res.status(500).json({ mensaje: 'Error al eliminar el cliente', error: error.message });
+    }
+}
+
 // Exportamos TODAS las funciones juntas en un solo objeto
 module.exports = {
     getClientes,
     getClienteById,
     postCliente,
-    actualizarCliente
+    actualizarCliente,
+    eliminarCliente
 };

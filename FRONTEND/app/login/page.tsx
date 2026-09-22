@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/context/InicioSesion';
+import { api, ApiError } from '@/lib/api';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -14,20 +15,32 @@ export default function LoginPage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-  e.preventDefault();
-  
-  // Aquí defines el correo y la contraseña de prueba
-  if (formData.email === 'admin@pintapro.com' && formData.password === 'admin123') {
-    login({
-      nombre: 'Administrador',
-      email: formData.  email,
-      role: 'admin',
-    });
-  } else {
-    alert('Credenciales incorrectas');
-  }
-};
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const data = await api.post<{ mensaje: string; usuario: any }>('/usuarios/login', {
+        correoUsuario: formData.email,
+        contraseniaUsuario: formData.password,
+      });
+
+      if (data && data.usuario) {
+        login(data.usuario);
+      } else {
+        setError('Respuesta no válida del servidor');
+      }
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message || 'Error al iniciar sesión');
+      } else {
+        setError('No se pudo conectar con el servidor. Verifica que el backend esté activo.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-yellow-600/80 p-4">

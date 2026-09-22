@@ -8,6 +8,7 @@ router.get('/:id', usuarioController.obtenerUsuarioPorId);
 router.post('/', usuarioController.crearUsuario);
 router.put('/:id', usuarioController.actualizarUsuario);
 router.patch('/:id/estado', usuarioController.cambiarEstadoUsuario);
+router.delete('/:id', usuarioController.eliminarUsuario);
 // Ruta para el inicio de sesión
 router.post('/login', usuarioController.login);
 
